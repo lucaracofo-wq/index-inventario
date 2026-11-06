@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inologic | Inograu</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#14243a;--blue:#1769aa;--teal:#0e8a83;--bg:#f3f6fa;--ink:#1d2939;--muted:#667085;--line:#e4eaf1;--red:#c0392b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px Arial,sans-serif;color:var(--ink)}
+button,input,select{font:inherit}button{border:0;border-radius:8px;padding:10px 15px;background:var(--blue);color:white;cursor:pointer;font-weight:600}button.secondary{background:#e8eef5;color:var(--navy)}button.danger{background:var(--red)}
+#login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#14243a,#1769aa)}
+.loginbox{background:white;padding:34px;border-radius:16px;width:min(92%,390px);box-shadow:0 20px 60px #0003}.loginbox h1{margin:0 0 6px}.loginbox p{color:var(--muted);margin:0 0 24px}
+label{display:block;font-size:13px;font-weight:700;margin:13px 0 6px}input,select{width:100%;padding:11px;border:1px solid #cfd8e3;border-radius:8px;background:white}
+.loginbox button{width:100%;margin-top:20px}.hint{font-size:12px;color:var(--muted);margin-top:14px}
+#app{display:none}.top{background:var(--navy);color:white;padding:17px 24px;display:flex;justify-content:space-between;align-items:center;gap:15px}.top h2{margin:0;font-size:20px}.top small{color:#c8d5e4}
+.wrap{max-width:1200px;margin:auto;padding:22px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.tabs button{background:#e4ebf3;color:var(--navy)}.tabs button.active{background:var(--blue);color:white}
+.panel{background:white;border:1px solid var(--line);border-radius:13px;padding:20px;margin-bottom:18px;box-shadow:0 3px 12px #14243a08}.panel h3{margin:0 0 15px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.stat{padding:17px;border-radius:11px;background:#f2f7fc}.stat strong{font-size:25px;display:block;color:var(--blue);margin-top:6px}.stat span{font-size:13px;color:var(--muted)}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:end}.row.two{grid-template-columns:repeat(2,1fr)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:650px}th,td{text-align:left;padding:11px;border-bottom:1px solid var(--line);font-size:13px}th{background:#f6f8fb;color:#475467}td.num{text-align:right}.badge{padding:4px 8px;border-radius:20px;background:#e7f5f3;color:#08766f;font-size:12px}
+.note{background:#fff8e6;border:1px solid #f3dfad;color:#72530b;padding:11px;border-radius:8px;font-size:13px;margin-bottom:15px}.hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:25px}
+@media(max-width:750px){.grid{grid-template-columns:repeat(2,1fr)}.row,.row.two{grid-template-columns:1fr}.top{padding:15px;align-items:flex-start}.wrap{padding:12px}.panel{padding:15px}}
+</style></head>
+<body>
+<section id="login">
+ <div class="loginbox"><h1>Inologic</h1><p>Gestión inteligente de inventarios · Inograu</p>
+ <label>Usuario</label><input id="username" autocomplete="username" placeholder="Ingrese su usuario">
+ <label>Contraseña</label><input id="password" type="password" autocomplete="current-password" placeholder="Ingrese su contraseña">
+ <button onclick="login()">Ingresar al sistema</button><div class="hint">Acceso de demostración: admin / 12345. Cambie estas credenciales en el código antes de usarlo en producción.</div>
+ <div id="loginError" style="color:#c0392b;font-size:13px;margin-top:10px"></div></div>
+</section>
+<div id="app">
+ <header class="top"><div><h2>Inologic <span style='font-weight:400;color:#b9d7e9'>| Inograu</span></h2><small>Control inteligente de entradas, existencias y salidas</small></div><button class="secondary" onclick="logout()">Cerrar sesión</button></header>
+ <main class="wrap">
+  <nav class="tabs">
+   <button class="active" data-tab="dashboard" onclick="tab('dashboard',this)">Resumen</button>
+   <button data-tab="importar" onclick="tab('importar',this)">Carga Excel / Entradas</button>
+   <button data-tab="salidas" onclick="tab('salidas',this)">Salidas / Traslados</button>
+   <button data-tab="movimientos" onclick="tab('movimientos',this)">Historial</button>
+  </nav>
+  <section id="dashboard" class="view">
+   <div class="grid">
+    <div class="stat"><span>Referencias registradas</span><strong id="sRefs">0</strong></div>
+    <div class="stat"><span>Unidades disponibles</span><strong id="sStock">0</strong></div>
+    <div class="stat"><span>Unidades ingresadas</span><strong id="sIn">0</strong></div>
+    <div class="stat"><span>Unidades despachadas</span><strong id="sOut">0</strong></div>
+   </div>
+   <div class="panel" style="margin-top:18px"><h3>Existencias actuales por referencia</h3><div id="dashTable"></div></div>
+  </section>
+  <section id="importar" class="view hidden">
+   <div class="panel"><h3>1. Cargar inventario desde Excel</h3>
+    <div class="note">El archivo debe contener encabezados. Se reconocen columnas como Referencia / SKU / Código, Descripción / Producto y Cantidad / Stock / Entrada. También puedes descargar la plantilla.</div>
+    <input type="file" id="excelFile" accept=".xlsx,.xls,.csv">
+    <div class="actions"><button onclick="importExcel()">Importar archivo</button><button class="secondary" onclick="template()">Descargar plantilla Excel</button></div>
+    <div id="importMsg" style="margin-top:12px;font-size:13px"></div>
+   </div>
+   <div class="panel"><h3>2. Registrar una entrada manual</h3>
+    <div class="row"><div><label>Referencia / SKU</label><input id="inRef" placeholder="Ej. REF-001"></div><div><label>Descripción</label><input id="inDesc" placeholder="Nombre del artículo"></div><div><label>Cantidad que ingresa</label><input id="inQty" type="number" min="1" step="1" placeholder="0"></div></div>
+    <div class="actions"><button onclick="manualEntry()">Registrar entrada</button></div>
+   </div>
+   <div class="panel"><h3>Inventario disponible</h3><div id="inventoryTable"></div></div>
+  </section>
+  <section id="salidas" class="view hidden">
+   <div class="panel"><h3>Registrar salida de almacén</h3>
+    <div class="note">Selecciona la referencia, indica la cantidad y registra si corresponde a un despacho, consumo o traslado a otra ubicación. El sistema valida que exista inventario suficiente.</div>
+    <div class="row"><div><label>Artículo / referencia</label><select id="outRef"><option value="">Seleccione una referencia</option></select></div><div><label>Cantidad a retirar</label><input id="outQty" type="number" min="1" step="1" placeholder="0"></div><div><label>Tipo de movimiento</label><select id="outType"><option>Salida / despacho</option><option>Traslado</option><option>Consumo interno</option><option>Devolución a proveedor</option></select></div></div>
+    <div class="row two"><div><label>Destino / responsable / documento</label><input id="outDest" placeholder="Ej. Sucursal norte / Orden 104"></div><div><label>Observación (opcional)</label><input id="outNote" placeholder="Detalle del movimiento"></div></div>
+    <div class="actions"><button onclick="registerOut()">Confirmar salida</button></div><div id="outMsg" style="margin-top:10px;font-size:13px"></div>
+   </div>
+   <div class="panel"><h3>Consulta de existencias</h3><div id="outTable"></div></div>
+  </section>
+  <section id="movimientos" class="view hidden"><div class="panel"><h3>Historial de movimientos</h3><div class="actions"><button class="secondary" onclick="exportMovements()">Exportar historial CSV</button><button class="secondary" onclick="exportInventory()">Exportar inventario CSV</button></div><div id="movesTable" style="margin-top:12px"></div></div></section>
+ </main>
+</div>
+<script>
+const KEY='inventario_crm_v1';
+let db=JSON.parse(localStorage.getItem(KEY)||'{"items":{},"moves":[]}');
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function login(){if(document.getElementById('username').value==='admin'&&document.getElementById('password').value==='12345'){document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';render()}else document.getElementById('loginError').textContent='Usuario o contraseña incorrectos.'}
+function logout(){document.getElementById('app').style.display='none';document.getElementById('login').style.display='grid';document.getElementById('password').value=''}
+function tab(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');render()}
+function addMove(ref,desc,qty,type,dest='',note=''){let item=db.items[ref]||{ref,desc,stock:0,totalIn:0,totalOut:0};item.desc=desc||item.desc;if(type==='Entrada'){item.stock+=qty;item.totalIn+=qty}else{item.stock-=qty;item.totalOut+=qty}db.items[ref]=item;db.moves.unshift({date:new Date().toLocaleString('es-CO'),ref,desc:item.desc,qty,type,dest,note,stock:item.stock});}
+function manualEntry(){let r=inRef.value.trim(),d=inDesc.value.trim(),q=Number(inQty.value);if(!r||!d||!Number.isInteger(q)||q<=0)return alert('Completa referencia, descripción y una cantidad entera mayor que cero.');addMove(r,d,q,'Entrada','Carga manual');inRef.value=inDesc.value=inQty.value='';save();alert('Entrada registrada correctamente.')}
+function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
+function importExcel(){let f=excelFile.files[0];if(!f)return alert('Selecciona un archivo Excel o CSV.');let reader=new FileReader();reader.onload=e=>{try{let wb=XLSX.read(e.target.result,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});if(!rows.length)throw Error('El archivo no contiene filas.');let keys=Object.keys(rows[0]),find=(terms)=>keys.find(k=>terms.some(t=>norm(k).includes(t)));let kr=find(['referencia','sku','codigo','ref']),kd=find(['descripcion','producto','articulo','nombre']),kq=find(['cantidad','stock','entrada','existencia']);if(!kr||!kq)throw Error('No encuentro las columnas de Referencia y Cantidad. Revisa los encabezados.');let count=0;rows.forEach(x=>{let r=String(x[kr]).trim(),d=kd?String(x[kd]).trim():r,q=Number(x[kq]);if(r&&Number.isInteger(q)&&q>0){addMove(r,d,q,'Entrada','Importación Excel');count++}});save();importMsg.textContent=`Importación terminada: ${count} filas válidas procesadas.`}catch(err){importMsg.textContent='Error: '+err.message}};reader.readAsArrayBuffer(f)}
+function registerOut(){let r=outRef.value,q=Number(outQty.value),type=outType.value,dest=outDest.value.trim(),note=outNote.value.trim();if(!r||!Number.isInteger(q)||q<=0)return alert('Selecciona un artículo e indica una cantidad entera válida.');let item=db.items[r];if(!item||item.stock<q){outMsg.style.color='#c0392b';outMsg.textContent='No hay existencias suficientes para esta operación.';return}addMove(r,item.desc,q,type,dest,note);save();outQty.value=outDest.value=outNote.value='';outMsg.style.color='#08766f';outMsg.textContent='Movimiento registrado. Existencias actualizadas.'}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function table(items){if(!items.length)return '<div class="empty">No hay registros todavía.</div>';return '<div class="tablewrap"><table><thead><tr><th>Referencia</th><th>Descripción</th><th>Existencia</th><th>Total entradas</th><th>Total salidas</th></tr></thead><tbody>'+items.map(x=>`<tr><td>${esc(x.ref)}</td><td>${esc(x.desc)}</td><td class="num"><b>${x.stock}</b></td><td class="num">${x.totalIn}</td><td class="num">${x.totalOut}</td></tr>`).join('')+'</tbody></table></div>'}
+function render(){let items=Object.values(db.items),moves=db.moves;document.getElementById('sRefs').textContent=items.length;document.getElementById('sStock').textContent=items.reduce((a,x)=>a+x.stock,0);document.getElementById('sIn').textContent=items.reduce((a,x)=>a+x.totalIn,0);document.getElementById('sOut').textContent=items.reduce((a,x)=>a+x.totalOut,0);dashTable.innerHTML=table(items);inventoryTable.innerHTML=table(items);outTable.innerHTML=table(items);outRef.innerHTML='<option value="">Seleccione una referencia</option>'+items.filter(x=>x.stock>0).map(x=>`<option value="${esc(x.ref)}">${esc(x.ref)} — ${esc(x.desc)} (disp.: ${x.stock})</option>`).join('');movesTable.innerHTML=moves.length?'<div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th>Descripción</th><th>Cantidad</th><th>Destino / detalle</th><th>Saldo</th></tr></thead><tbody>'+moves.map(m=>`<tr><td>${esc(m.date)}</td><td><span class="badge">${esc(m.type)}</span></td><td>${esc(m.ref)}</td><td>${esc(m.desc)}</td><td>${m.qty}</td><td>${esc(m.dest)} ${esc(m.note)}</td><td>${m.stock}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Aún no hay movimientos registrados.</div>'}
+function template(){let data=[{Referencia:'REF-001',Descripcion:'Artículo de ejemplo',Cantidad:25},{Referencia:'REF-002',Descripcion:'Otro artículo',Cantidad:10}];let ws=XLSX.utils.json_to_sheet(data),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Entradas');XLSX.writeFile(wb,'plantilla_entradas_inventario.xlsx')}
+function csv(name,rows){let content=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+content],{type:'text/csv;charset=utf-8'}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
+function exportInventory(){csv('inventario_actual.csv',[['Referencia','Descripción','Existencia','Total entradas','Total salidas'],...Object.values(db.items).map(x=>[x.ref,x.desc,x.stock,x.totalIn,x.totalOut])])}
+function exportMovements(){csv('historial_movimientos.csv',[['Fecha','Tipo','Referencia','Descripción','Cantidad','Destino','Observación','Saldo'],...db.moves.map(x=>[x.date,x.type,x.ref,x.desc,x.qty,x.dest,x.note,x.stock])])}
+</script></body></html>
